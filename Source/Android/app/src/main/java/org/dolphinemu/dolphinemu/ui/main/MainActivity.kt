@@ -23,6 +23,7 @@ import org.dolphinemu.dolphinemu.features.settings.model.IntSetting
 import org.dolphinemu.dolphinemu.features.settings.model.NativeConfig
 import org.dolphinemu.dolphinemu.features.settings.ui.MenuTag
 import org.dolphinemu.dolphinemu.features.settings.ui.SettingsActivity
+import org.dolphinemu.dolphinemu.features.performance.PerformanceManager
 import org.dolphinemu.dolphinemu.fragments.GridOptionDialogFragment
 import org.dolphinemu.dolphinemu.services.GameFileCacheManager
 import org.dolphinemu.dolphinemu.ui.platform.PlatformGamesView
@@ -32,6 +33,7 @@ import org.dolphinemu.dolphinemu.utils.DirectoryInitialization
 import org.dolphinemu.dolphinemu.utils.InsetsHelper
 import org.dolphinemu.dolphinemu.utils.PermissionsHandler
 import org.dolphinemu.dolphinemu.utils.StartupHandler
+import org.dolphinemu.dolphinemu.utils.AynThorOptimizer
 import org.dolphinemu.dolphinemu.utils.ThemeHelper
 import org.dolphinemu.dolphinemu.utils.WiiUtils
 
@@ -51,6 +53,42 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
         enableEdgeToEdge()
 
         super.onCreate(savedInstanceState)
+
+        // Phase 1 : Optimisations de base
+        AynThorOptimizer.applyOptimizationsIfNeeded(this)
+
+        // Debug: afficher infos device
+        if (BuildConfig.DEBUG) {
+            Log.debug(AynThorOptimizer.getDeviceInfo())
+        }
+
+        // Phase 2 : Gestion de performance
+        if (AynThorOptimizer.isAynThor()) {
+            performanceManager = PerformanceManager.getInstance(this)
+
+            // Appliquer le profil par défaut au premier lancement
+            val prefs = context.getSharedPreferences("dolphin_performance", Context.MODE_PRIVATE)
+            val firstRun = prefs.getBoolean("performance_first_run", true)
+
+            if (firstRun) {
+                performanceManager.setProfile(PerformanceProfile.BALANCED)
+                prefs.edit().putBoolean("performance_first_run", false).apply()
+
+                Toast.makeText(
+                    this,
+                    "Ayn Thor: Balanced profile applied",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+
+            // Démarrer le monitoring thermique
+            performanceManager.startThermalMonitoring()
+
+            // Debug
+            if (BuildConfig.DEBUG) {
+                Log.debug(performanceManager.getPerformanceStats())
+            }
+        }
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -94,6 +132,10 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
         ThemeHelper.setCorrectTheme(this)
 
         super.onResume()
+        // Redémarrer monitoring thermique si Ayn Thor
+        if (AynThorOptimizer.isAynThor()) {
+            performanceManager.startThermalMonitoring()
+        }
         if (DirectoryInitialization.shouldStart(this)) {
             DirectoryInitialization.start(this)
             AfterDirectoryInitializationRunner()
@@ -101,6 +143,15 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
         }
 
         presenter.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        // Arrêter monitoring pour économiser batterie
+        if (AynThorOptimizer.isAynThor()) {
+            performanceManager.stopThermalMonitoring()
+        }
     }
 
     override fun onStop() {

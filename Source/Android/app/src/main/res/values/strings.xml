@@ -18,6 +18,36 @@
     <string name="wiimote_2">Wii Remote 3</string>
     <string name="wiimote_3">Wii Remote 4</string>
 
+    <!-- Ayn Thor Optimizations -->
+    <string name="ayn_thor_reapply_optimizations">Reapply Ayn Thor Optimizations</string>
+    <string name="ayn_thor_reapply_optimizations_description">Force reapply performance settings optimized for Snapdragon 8 Gen 2</string>
+    <string name="ayn_thor_device_info">Show Device Information</string>
+    <string name="ayn_thor_device_info_description">Display hardware detection details</string>
+    <string name="optimizations_applied">Optimizations applied successfully!</string>
+
+    <!-- Performance Profiles (Phase 2) -->
+    <string name="performance_profile_header">Performance Profile (Ayn Thor)</string>
+    <string name="performance_profile_title">Performance Profile</string>
+    <string name="performance_profile_description">Choose performance vs battery balance</string>
+
+    <string-array name="performanceProfileNames">
+        <item>Battery Saver</item>
+        <item>Balanced (Recommended)</item>
+        <item>Performance</item>
+    </string-array>
+
+    <string-array name="performanceProfileValues">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
+    <string name="auto_thermal_title">Auto Thermal Management</string>
+    <string name="auto_thermal_description">Automatically adjust settings when device gets hot</string>
+
+    <string name="performance_stats_title">Show Performance Stats</string>
+    <string name="performance_stats_description">Display thermal and performance information</string>
+
     <string name="wiimote_extension_0">Wii Remote Extension 1</string>
     <string name="wiimote_extension_1">Wii Remote Extension 2</string>
     <string name="wiimote_extension_2">Wii Remote Extension 3</string>

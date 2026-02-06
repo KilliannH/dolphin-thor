@@ -208,6 +208,33 @@ class SettingsFragmentPresenter(
             RunRunnable(context, R.string.user_data_submenu, 0, 0, 0, false)
             { UserDataActivity.launch(context) }
         )
+        if (AynThorOptimizer.isAynThor() || BuildConfig.DEBUG) {
+            sl.add(
+                RunnableSetting(
+                    context,
+                    R.string.ayn_thor_reapply_optimizations, // String à ajouter
+                    0,
+                    R.string.ayn_thor_reapply_optimizations_description
+                ) {
+                    val success = AynThorOptimizer.forceApplyOptimizations(context)
+                    if (success) {
+                        view.showToastMessage(context.getString(R.string.optimizations_applied))
+                    }
+                }
+            )
+
+            sl.add(
+                RunnableSetting(
+                    context,
+                    R.string.ayn_thor_device_info,
+                    0,
+                    R.string.ayn_thor_device_info_description
+                ) {
+                    // Afficher dialog avec infos
+                    showDeviceInfoDialog()
+                }
+            )
+        }
     }
 
     private fun addGeneralSettings(sl: ArrayList<SettingsItem>) {
@@ -1273,6 +1300,86 @@ class SettingsFragmentPresenter(
                 R.string.emulate_disc_speed_description
             )
         )
+        if (AynThorOptimizer.isAynThor()) {
+            sl.add(HeaderSetting(context, R.string.performance_profile_header, 0))
+
+            // Choix du profil
+            sl.add(
+                SingleChoiceSetting(
+                    context,
+                    IntSetting.MAIN_PERF_PROFILE, // Nouveau setting
+                    R.string.performance_profile_title,
+                    R.string.performance_profile_description,
+                    R.array.performanceProfileNames,
+                    R.array.performanceProfileValues,
+                    PerformanceProfile.BALANCED.ordinal,
+                    object : AbstractIntSetting {
+                        override fun getInt(settings: Settings): Int {
+                            val manager = PerformanceManager.getInstance(context)
+                            return manager.getCurrentProfile().ordinal
+                        }
+
+                        override fun setInt(settings: Settings, newValue: Int) {
+                            val manager = PerformanceManager.getInstance(context)
+                            val profile = PerformanceProfile.values()[newValue]
+                            manager.setProfile(profile)
+                            view.showToastMessage("Profile changed to: ${profile.profileName}")
+                        }
+                    }
+                )
+            )
+
+            // Auto thermal management
+            sl.add(
+                SwitchSetting(
+                    context,
+                    BooleanSetting.MAIN_AUTO_THERMAL,
+                    R.string.auto_thermal_title,
+                    R.string.auto_thermal_description,
+                    true,
+                    object : AbstractBooleanSetting {
+                        override fun getBoolean(settings: Settings): Boolean {
+                            val manager = PerformanceManager.getInstance(context)
+                            return manager.isAutoThermalEnabled()
+                        }
+
+                        override fun setBoolean(settings: Settings, newValue: Boolean) {
+                            val manager = PerformanceManager.getInstance(context)
+                            manager.setAutoThermalManagement(newValue)
+                        }
+                    }
+                )
+            )
+
+            // Bouton debug stats
+            if (BuildConfig.DEBUG) {
+                sl.add(
+                    RunnableSetting(
+                        context,
+                        R.string.performance_stats_title,
+                        R.string.performance_stats_description,
+                        0,
+                        {
+                            val manager = PerformanceManager.getInstance(context)
+                            showPerformanceStatsDialog(manager.getPerformanceStats())
+                        }
+                    )
+                )
+            }
+        }
+    }
+
+    private fun showPerformanceStatsDialog(stats: String) {
+        MaterialAlertDialogBuilder(context)
+            .setTitle("Performance Statistics")
+            .setMessage(stats)
+            .setPositiveButton("OK", null)
+            .setNeutralButton("Refresh") { _, _ ->
+                val manager = PerformanceManager.getInstance(context)
+                manager.checkThermalNow()
+                showPerformanceStatsDialog(manager.getPerformanceStats())
+            }
+            .show()
     }
 
     private fun addSerialPortSubSettings(sl: ArrayList<SettingsItem>, serialPort1Type: Int) {
