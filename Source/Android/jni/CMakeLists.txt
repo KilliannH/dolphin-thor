@@ -12,6 +12,7 @@ add_library(main SHARED
   Config/PostProcessing.cpp
   GameList/GameFile.cpp
   GameList/GameFile.h
+  AndroidCommon/CpuAffinity.cpp
   GameList/GameFileCache.cpp
   GpuDriver.cpp
   Host.cpp

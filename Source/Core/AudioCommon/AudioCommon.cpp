@@ -20,6 +20,9 @@
 #include "Core/Config/MainSettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/System.h"
+#ifdef ANDROID
+#include "jni/AndroidCommon/CpuAffinity.h"
+#endif
 
 namespace AudioCommon
 {
@@ -49,6 +52,10 @@ void InitSoundStream(Core::System& system)
 {
   std::string backend = Config::Get(Config::MAIN_AUDIO_BACKEND);
   std::unique_ptr<SoundStream> sound_stream = CreateSoundStreamForBackend(backend);
+
+#ifdef ANDROID
+    AndroidCpuAffinity::SetAudioThreadAffinity();
+#endif
 
   if (!sound_stream)
   {

@@ -68,6 +68,9 @@
 #include "VideoCommon/VideoState.h"
 #include "VideoCommon/Widescreen.h"
 #include "VideoCommon/XFStateManager.h"
+#ifdef ANDROID
+#include "jni/AndroidCommon/CpuAffinity.h"
+#endif
 
 VideoBackendBase* g_video_backend = nullptr;
 
@@ -95,6 +98,9 @@ std::string VideoBackendBase::BadShaderFilename(const char* shader_stage, int co
 void VideoBackendBase::Video_OutputXFB(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height,
                                        u64 ticks)
 {
+#ifdef ANDROID
+    AndroidCpuAffinity::SetGPUThreadAffinity();
+#endif
   if (!m_initialized || !g_presenter)
     return;
 

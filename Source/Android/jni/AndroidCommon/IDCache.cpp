@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "jni/AndroidCommon/IDCache.h"
+#include "jni/AndroidCommon/CpuAffinity.h"
 
 #include <jni.h>
 
@@ -582,6 +583,9 @@ extern "C" {
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
 {
   s_java_vm = vm;
+
+  // Initialize CPU affinity for Snapdragon 8 Gen 2
+  AndroidCpuAffinity::Initialize();
 
   JNIEnv* env;
   if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK)

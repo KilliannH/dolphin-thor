@@ -36,6 +36,7 @@
 #include "Common/Thread.h"
 #include "Common/TimeUtil.h"
 #include "Common/Version.h"
+#include "jni/AndroidCommon/CpuAffinity.h"
 
 #include "Core/AchievementManager.h"
 #include "Core/Boot/Boot.h"
@@ -358,6 +359,11 @@ static void CpuThread(Core::System& system, const std::optional<std::string>& sa
     State expected = State::Starting;
     s_state.compare_exchange_strong(expected, State::Running);
   }
+
+#ifdef ANDROID
+        // Optimisation Snapdragon 8 Gen 2
+  AndroidCpuAffinity::SetPowerPCThreadAffinity();
+#endif
 
   {
 #ifndef _WIN32

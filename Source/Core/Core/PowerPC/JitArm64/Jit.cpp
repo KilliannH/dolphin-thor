@@ -37,6 +37,9 @@
 #include "Core/PowerPC/JitInterface.h"
 #include "Core/PowerPC/PowerPC.h"
 #include "Core/System.h"
+#ifdef ANDROID
+#include "jni/AndroidCommon/CpuAffinity.h"
+#endif
 
 using namespace Arm64Gen;
 
@@ -61,6 +64,27 @@ void JitArm64::Init()
   InitFastmemArena();
 
   RefreshConfig();
+
+#ifdef __ARM_FEATURE_SVE
+    bool has_sve = AndroidCpuAffinity::IsSnapdragon8Gen2();
+  if (has_sve)
+  {
+    INFO_LOG_FMT(POWERPC, "SVE detected on Snapdragon 8 Gen 2");
+    jo.optimizeGatherPipe = true;
+  }
+#endif
+
+    // Optimisations cache pour SD8G2
+    if (AndroidCpuAffinity::IsSnapdragon8Gen2())
+    {
+        // Cache L2: 512KB par cluster Gold
+        // Cache L3: 6MB partagé
+
+        // Augmenter taille code cache pour profiter du L3
+        AllocCodeSpace(64 * 1024 * 1024);  // 64MB au lieu de 32MB
+
+        INFO_LOG_FMT(POWERPC, "Snapdragon 8 Gen 2 JIT optimizations enabled");
+    }
 
   // We want the regions to be laid out in this order in memory:
   // m_far_code_0, m_near_code_0, m_near_code_1, m_far_code_1.
