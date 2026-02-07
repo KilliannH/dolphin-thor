@@ -10,6 +10,8 @@ add_library(videovulkan
   StagingBuffer.h
   StateTracker.cpp
   StateTracker.h
+  AdrenoOptimizations.cpp
+  AdrenoOptimizations.h
   VKBoundingBox.cpp
   VKBoundingBox.h
   VKMain.cpp

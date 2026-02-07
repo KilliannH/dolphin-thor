@@ -74,6 +74,11 @@ void JitArm64::Init()
   }
 #endif
 
+  // We want the regions to be laid out in this order in memory:
+  // m_far_code_0, m_near_code_0, m_near_code_1, m_far_code_1.
+  // AddChildCodeSpace grabs space from the end of the parent region,
+  // so we have to call AddChildCodeSpace in reverse order.
+
     // Optimisations cache pour SD8G2
     if (AndroidCpuAffinity::IsSnapdragon8Gen2())
     {
@@ -84,13 +89,9 @@ void JitArm64::Init()
         AllocCodeSpace(64 * 1024 * 1024);  // 64MB au lieu de 32MB
 
         INFO_LOG_FMT(POWERPC, "Snapdragon 8 Gen 2 JIT optimizations enabled");
+    } else {
+        AllocCodeSpace(TOTAL_CODE_SIZE);
     }
-
-  // We want the regions to be laid out in this order in memory:
-  // m_far_code_0, m_near_code_0, m_near_code_1, m_far_code_1.
-  // AddChildCodeSpace grabs space from the end of the parent region,
-  // so we have to call AddChildCodeSpace in reverse order.
-  AllocCodeSpace(TOTAL_CODE_SIZE);
   AddChildCodeSpace(&m_far_code_1, FAR_CODE_SIZE);
   AddChildCodeSpace(&m_near_code_1, NEAR_CODE_SIZE);
   AddChildCodeSpace(&m_near_code_0, NEAR_CODE_SIZE);

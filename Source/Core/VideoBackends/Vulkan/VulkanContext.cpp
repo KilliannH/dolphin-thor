@@ -13,6 +13,7 @@
 
 #include "VideoCommon/DriverDetails.h"
 #include "VideoCommon/VideoCommon.h"
+#include "VideoBackends/Vulkan/AdrenoOptimizations.h"
 
 namespace Vulkan
 {
@@ -613,66 +614,100 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(VkInstance instance, VkPhys
 }
 
 bool VulkanContext::SelectDeviceExtensions(bool enable_surface)
-{
-  u32 extension_count = 0;
-  VkResult res =
-      vkEnumerateDeviceExtensionProperties(m_physical_device, nullptr, &extension_count, nullptr);
-  if (res != VK_SUCCESS)
-  {
-    LOG_VULKAN_ERROR(res, "vkEnumerateDeviceExtensionProperties failed: ");
-    return false;
-  }
-
-  if (extension_count == 0)
-  {
-    ERROR_LOG_FMT(VIDEO, "Vulkan: No extensions supported by device.");
-    return false;
-  }
-
-  std::vector<VkExtensionProperties> available_extension_list(extension_count);
-  res = vkEnumerateDeviceExtensionProperties(m_physical_device, nullptr, &extension_count,
-                                             available_extension_list.data());
-  ASSERT(res == VK_SUCCESS);
-
-  for (const auto& extension_properties : available_extension_list)
-    INFO_LOG_FMT(VIDEO, "Available extension: {}", extension_properties.extensionName);
-
-  auto AddExtension = [&](const char* name, bool required) {
-    if (Common::Contains(available_extension_list, std::string_view{name},
-                         &VkExtensionProperties::extensionName))
     {
-      INFO_LOG_FMT(VIDEO, "Enabling extension: {}", name);
-      m_device_extensions.push_back(name);
-      return true;
-    }
+        u32 extension_count = 0;
+        VkResult res =
+                vkEnumerateDeviceExtensionProperties(m_physical_device, nullptr, &extension_count, nullptr);
 
-    if (required)
-      ERROR_LOG_FMT(VIDEO, "Vulkan: Missing required extension {}.", name);
+        if (res != VK_SUCCESS)
+        {
+            LOG_VULKAN_ERROR(res, "vkEnumerateDeviceExtensionProperties failed: ");
+            return false;
+        }
 
-    return false;
-  };
+        if (extension_count == 0)
+        {
+            ERROR_LOG_FMT(VIDEO, "Vulkan: No extensions supported by device.");
+            return false;
+        }
 
-  if (enable_surface && !AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME, true))
-    return false;
+        std::vector<VkExtensionProperties> available_extension_list(extension_count);
+        res = vkEnumerateDeviceExtensionProperties(m_physical_device, nullptr, &extension_count,
+                                                   available_extension_list.data());
+        ASSERT(res == VK_SUCCESS);
+
+        for (const auto& extension_properties : available_extension_list)
+            INFO_LOG_FMT(VIDEO, "Available extension: {}", extension_properties.extensionName);
+
+        auto AddExtension = [&](const char* name, bool required) {
+            if (Common::Contains(available_extension_list, std::string_view{name},
+                                 &VkExtensionProperties::extensionName))
+            {
+                INFO_LOG_FMT(VIDEO, "Enabling extension: {}", name);
+                m_device_extensions.push_back(name);
+                return true;
+            }
+
+            if (required)
+                ERROR_LOG_FMT(VIDEO, "Vulkan: Missing required extension {}.", name);
+
+            return false;
+        };
+
+        if (enable_surface && !AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME, true))
+            return false;
 
 #ifdef SUPPORTS_VULKAN_EXCLUSIVE_FULLSCREEN
-  // VK_EXT_full_screen_exclusive
+        // VK_EXT_full_screen_exclusive
   if (AddExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME, true))
     INFO_LOG_FMT(VIDEO, "Using VK_EXT_full_screen_exclusive for exclusive fullscreen.");
 #endif
 
-  AddExtension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, false);
-  AddExtension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, false);
+        AddExtension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, false);
+        AddExtension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, false);
 
-  if (!DriverDetails::HasBug(DriverDetails::BUG_BROKEN_DEPTH_CLAMP_CONTROL))
-  {
-    // Unrestricted depth range is one of the few extensions that changes the behavior
-    // of Vulkan just by being enabled, so we rely on lazy evaluation to ensure it is
-    // not enabled unless depth clamp control is supported.
-    g_backend_info.bSupportsUnrestrictedDepthRange =
-        AddExtension(VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME, false) &&
-        AddExtension(VK_EXT_DEPTH_RANGE_UNRESTRICTED_EXTENSION_NAME, false);
-  }
+        if (!DriverDetails::HasBug(DriverDetails::BUG_BROKEN_DEPTH_CLAMP_CONTROL))
+        {
+            // Unrestricted depth range is one of the few extensions that changes the behavior
+            // of Vulkan just by being enabled, so we rely on lazy evaluation to ensure it is
+            // not enabled unless depth clamp control is supported.
+            g_backend_info.bSupportsUnrestrictedDepthRange =
+                    AddExtension(VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME, false) &&
+                    AddExtension(VK_EXT_DEPTH_RANGE_UNRESTRICTED_EXTENSION_NAME, false);
+        }
+
+        // === AJOUTER : Détection Adreno 740 à la FIN ===
+#ifdef ANDROID
+#include "VideoBackends/Vulkan/AdrenoOptimizations.h"
+
+        bool is_adreno_740 = AdrenoOptimizations::IsAdreno740(
+                m_device_info.deviceName,  // <-- CORRECTION ICI
+                m_device_info.vendorID,    // <-- CORRECTION ICI
+                m_device_info.deviceID     // <-- CORRECTION ICI
+        );
+
+        bool is_turnip = AdrenoOptimizations::IsTurnipDriver(m_device_info.deviceName);
+
+        if (is_adreno_740)
+        {
+            INFO_LOG_FMT(VIDEO, "🔥 Adreno 740 detected! Applying optimizations...");
+
+            // Ajouter extensions optimales
+            auto optimal_extensions = AdrenoOptimizations::GetOptimalExtensions(is_turnip);
+            for (const char* ext : optimal_extensions)
+            {
+                // Utiliser AddExtension au lieu de push_back directement
+                if (AddExtension(ext, false))  // false = pas obligatoire
+                {
+                    INFO_LOG_FMT(VIDEO, "  ✓ Added Adreno extension: {}", ext);
+                }
+            }
+
+            // Stocker pour utilisation ultérieure
+            m_is_adreno_740 = true;
+            m_is_turnip = is_turnip;
+        }
+#endif
 
   return true;
 }
@@ -688,150 +723,207 @@ void VulkanContext::WarnMissingDeviceFeatures()
   }
 }
 
-bool VulkanContext::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer)
-{
-  u32 queue_family_count;
-  vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &queue_family_count, nullptr);
-  if (queue_family_count == 0)
-  {
-    ERROR_LOG_FMT(VIDEO, "No queue families found on specified vulkan physical device.");
-    return false;
-  }
-
-  std::vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count);
-  vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &queue_family_count,
-                                           queue_family_properties.data());
-  INFO_LOG_FMT(VIDEO, "{} vulkan queue families", queue_family_count);
-
-  // Find graphics and present queues.
-  m_graphics_queue_family_index = queue_family_count;
-  m_present_queue_family_index = queue_family_count;
-  for (uint32_t i = 0; i < queue_family_count; i++)
-  {
-    VkBool32 graphics_supported = queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT;
-    if (graphics_supported)
+    bool VulkanContext::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer)
     {
-      m_graphics_queue_family_index = i;
-      // Quit now, no need for a present queue.
-      if (!surface)
-      {
-        break;
-      }
+        u32 queue_family_count;
+        vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &queue_family_count, nullptr);
+        if (queue_family_count == 0)
+        {
+            ERROR_LOG_FMT(VIDEO, "No queue families found on specified vulkan physical device.");
+            return false;
+        }
+
+        std::vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count);
+        vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &queue_family_count,
+                                                 queue_family_properties.data());
+        INFO_LOG_FMT(VIDEO, "{} vulkan queue families", queue_family_count);
+
+        // Find graphics and present queues.
+        m_graphics_queue_family_index = queue_family_count;
+        m_present_queue_family_index = queue_family_count;
+        for (uint32_t i = 0; i < queue_family_count; i++)
+        {
+            VkBool32 graphics_supported = queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT;
+            if (graphics_supported)
+            {
+                m_graphics_queue_family_index = i;
+                // Quit now, no need for a present queue.
+                if (!surface)
+                {
+                    break;
+                }
+            }
+
+            if (surface)
+            {
+                VkBool32 present_supported;
+                VkResult res =
+                        vkGetPhysicalDeviceSurfaceSupportKHR(m_physical_device, i, surface, &present_supported);
+                if (res != VK_SUCCESS)
+                {
+                    LOG_VULKAN_ERROR(res, "vkGetPhysicalDeviceSurfaceSupportKHR failed: ");
+                    return false;
+                }
+
+                if (present_supported)
+                {
+                    m_present_queue_family_index = i;
+                }
+
+                // Prefer one queue family index that does both graphics and present.
+                if (graphics_supported && present_supported)
+                {
+                    break;
+                }
+            }
+        }
+        if (m_graphics_queue_family_index == queue_family_count)
+        {
+            ERROR_LOG_FMT(VIDEO, "Vulkan: Failed to find an acceptable graphics queue.");
+            return false;
+        }
+        if (surface && m_present_queue_family_index == queue_family_count)
+        {
+            ERROR_LOG_FMT(VIDEO, "Vulkan: Failed to find an acceptable present queue.");
+            return false;
+        }
+
+        VkDeviceCreateInfo device_info = {};
+        device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        device_info.pNext = nullptr;
+        device_info.flags = 0;
+
+        static constexpr float queue_priorities[] = {1.0f};
+        VkDeviceQueueCreateInfo graphics_queue_info = {};
+        graphics_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        graphics_queue_info.pNext = nullptr;
+        graphics_queue_info.flags = 0;
+        graphics_queue_info.queueFamilyIndex = m_graphics_queue_family_index;
+        graphics_queue_info.queueCount = 1;
+        graphics_queue_info.pQueuePriorities = queue_priorities;
+
+        VkDeviceQueueCreateInfo present_queue_info = {};
+        present_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        present_queue_info.pNext = nullptr;
+        present_queue_info.flags = 0;
+        present_queue_info.queueFamilyIndex = m_present_queue_family_index;
+        present_queue_info.queueCount = 1;
+        present_queue_info.pQueuePriorities = queue_priorities;
+
+        std::array<VkDeviceQueueCreateInfo, 2> queue_infos = {{
+                                                                      graphics_queue_info,
+                                                                      present_queue_info,
+                                                              }};
+
+        device_info.queueCreateInfoCount = 1;
+        if (m_graphics_queue_family_index != m_present_queue_family_index &&
+            m_present_queue_family_index != queue_family_count)
+        {
+            device_info.queueCreateInfoCount = 2;
+        }
+        device_info.pQueueCreateInfos = queue_infos.data();
+
+        if (!SelectDeviceExtensions(surface != VK_NULL_HANDLE))
+            return false;
+
+        // convert std::string list to a char pointer list which we can feed in
+        std::vector<const char*> extension_name_pointers;
+        for (const std::string& name : m_device_extensions)
+            extension_name_pointers.push_back(name.c_str());
+
+        device_info.enabledLayerCount = 0;
+        device_info.ppEnabledLayerNames = nullptr;
+        device_info.enabledExtensionCount = static_cast<uint32_t>(extension_name_pointers.size());
+        device_info.ppEnabledExtensionNames = extension_name_pointers.data();
+
+        WarnMissingDeviceFeatures();
+
+        VkPhysicalDeviceFeatures device_features = m_device_info.features();
+        device_info.pEnabledFeatures = &device_features;
+
+        // Enable debug layer on debug builds
+        if (enable_validation_layer)
+        {
+            device_info.enabledLayerCount = 1;
+            device_info.ppEnabledLayerNames = &VALIDATION_LAYER_NAME;
+        }
+
+        // === CRÉER LE DEVICE D'ABORD ===
+        VkResult res = vkCreateDevice(m_physical_device, &device_info, nullptr, &m_device);
+        if (res != VK_SUCCESS)
+        {
+            LOG_VULKAN_ERROR(res, "vkCreateDevice failed: ");
+            return false;
+        }
+
+        // With the device created, we can fill the remaining entry points.
+        if (!LoadVulkanDeviceFunctions(m_device))
+            return false;
+
+        // Grab the graphics and present queues.
+        vkGetDeviceQueue(m_device, m_graphics_queue_family_index, 0, &m_graphics_queue);
+        if (surface)
+        {
+            vkGetDeviceQueue(m_device, m_present_queue_family_index, 0, &m_present_queue);
+        }
+
+        // === MAINTENANT CRÉER LE DESCRIPTOR POOL ===
+#ifdef ANDROID
+#include "VideoBackends/Vulkan/AdrenoOptimizations.h"
+#endif
+
+        std::array<VkDescriptorPoolSize, 4> pool_sizes;
+
+#ifdef ANDROID
+        if (IsAdreno740())
+  {
+    auto optimal_sizes = AdrenoOptimizations::GetOptimalDescriptorPoolSizes();
+
+    pool_sizes = {{
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, optimal_sizes.uniform_buffers},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, optimal_sizes.combined_image_samplers},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, optimal_sizes.storage_buffers},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, optimal_sizes.uniform_texel_buffers}
+    }};
+
+    INFO_LOG_FMT(VIDEO, "Adreno 740: Using optimized descriptor pool ({}K samplers)",
+                 optimal_sizes.combined_image_samplers / 1024);
+  }
+  else
+#endif
+        {
+            // Pool sizes par défaut
+            pool_sizes = {{
+                                  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024},
+                                  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4096},
+                                  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 512},
+                                  {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 128}
+                          }};
+        }
+
+        VkDescriptorPoolCreateInfo pool_info = {
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+                .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+#ifdef ANDROID
+                .maxSets = IsAdreno740() ? 16384u : 100000u,  // Plus de sets pour Adreno
+#else
+                .maxSets = 100000u,
+#endif
+                .poolSizeCount = static_cast<u32>(pool_sizes.size()),
+                .pPoolSizes = pool_sizes.data()
+        };
+
+        VkResult pool_res = vkCreateDescriptorPool(m_device, &pool_info, nullptr, &m_descriptor_pool);
+        if (pool_res != VK_SUCCESS)
+        {
+            LOG_VULKAN_ERROR(pool_res, "vkCreateDescriptorPool failed: ");
+            return false;
+        }
+
+        INFO_LOG_FMT(VIDEO, "Descriptor pool created successfully");
+
+        return true;
     }
-
-    if (surface)
-    {
-      VkBool32 present_supported;
-      VkResult res =
-          vkGetPhysicalDeviceSurfaceSupportKHR(m_physical_device, i, surface, &present_supported);
-      if (res != VK_SUCCESS)
-      {
-        LOG_VULKAN_ERROR(res, "vkGetPhysicalDeviceSurfaceSupportKHR failed: ");
-        return false;
-      }
-
-      if (present_supported)
-      {
-        m_present_queue_family_index = i;
-      }
-
-      // Prefer one queue family index that does both graphics and present.
-      if (graphics_supported && present_supported)
-      {
-        break;
-      }
-    }
-  }
-  if (m_graphics_queue_family_index == queue_family_count)
-  {
-    ERROR_LOG_FMT(VIDEO, "Vulkan: Failed to find an acceptable graphics queue.");
-    return false;
-  }
-  if (surface && m_present_queue_family_index == queue_family_count)
-  {
-    ERROR_LOG_FMT(VIDEO, "Vulkan: Failed to find an acceptable present queue.");
-    return false;
-  }
-
-  VkDeviceCreateInfo device_info = {};
-  device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  device_info.pNext = nullptr;
-  device_info.flags = 0;
-
-  static constexpr float queue_priorities[] = {1.0f};
-  VkDeviceQueueCreateInfo graphics_queue_info = {};
-  graphics_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  graphics_queue_info.pNext = nullptr;
-  graphics_queue_info.flags = 0;
-  graphics_queue_info.queueFamilyIndex = m_graphics_queue_family_index;
-  graphics_queue_info.queueCount = 1;
-  graphics_queue_info.pQueuePriorities = queue_priorities;
-
-  VkDeviceQueueCreateInfo present_queue_info = {};
-  present_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  present_queue_info.pNext = nullptr;
-  present_queue_info.flags = 0;
-  present_queue_info.queueFamilyIndex = m_present_queue_family_index;
-  present_queue_info.queueCount = 1;
-  present_queue_info.pQueuePriorities = queue_priorities;
-
-  std::array<VkDeviceQueueCreateInfo, 2> queue_infos = {{
-      graphics_queue_info,
-      present_queue_info,
-  }};
-
-  device_info.queueCreateInfoCount = 1;
-  if (m_graphics_queue_family_index != m_present_queue_family_index &&
-      m_present_queue_family_index != queue_family_count)
-  {
-    device_info.queueCreateInfoCount = 2;
-  }
-  device_info.pQueueCreateInfos = queue_infos.data();
-
-  if (!SelectDeviceExtensions(surface != VK_NULL_HANDLE))
-    return false;
-
-  // convert std::string list to a char pointer list which we can feed in
-  std::vector<const char*> extension_name_pointers;
-  for (const std::string& name : m_device_extensions)
-    extension_name_pointers.push_back(name.c_str());
-
-  device_info.enabledLayerCount = 0;
-  device_info.ppEnabledLayerNames = nullptr;
-  device_info.enabledExtensionCount = static_cast<uint32_t>(extension_name_pointers.size());
-  device_info.ppEnabledExtensionNames = extension_name_pointers.data();
-
-  WarnMissingDeviceFeatures();
-
-  VkPhysicalDeviceFeatures device_features = m_device_info.features();
-  device_info.pEnabledFeatures = &device_features;
-
-  // Enable debug layer on debug builds
-  if (enable_validation_layer)
-  {
-    device_info.enabledLayerCount = 1;
-    device_info.ppEnabledLayerNames = &VALIDATION_LAYER_NAME;
-  }
-
-  VkResult res = vkCreateDevice(m_physical_device, &device_info, nullptr, &m_device);
-  if (res != VK_SUCCESS)
-  {
-    LOG_VULKAN_ERROR(res, "vkCreateDevice failed: ");
-    return false;
-  }
-
-  // With the device created, we can fill the remaining entry points.
-  if (!LoadVulkanDeviceFunctions(m_device))
-    return false;
-
-  // Grab the graphics and present queues.
-  vkGetDeviceQueue(m_device, m_graphics_queue_family_index, 0, &m_graphics_queue);
-  if (surface)
-  {
-    vkGetDeviceQueue(m_device, m_present_queue_family_index, 0, &m_present_queue);
-  }
-  return true;
-}
 
 bool VulkanContext::CreateAllocator(u32 vk_api_version)
 {

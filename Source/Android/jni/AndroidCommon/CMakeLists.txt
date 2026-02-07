@@ -1,6 +1,8 @@
 add_library(androidcommon STATIC
   AndroidCommon.cpp
   AndroidCommon.h
+  CpuAffinity.cpp
+  CpuAffinity.h
   IDCache.cpp
   IDCache.h
 )

@@ -23,6 +23,9 @@
 
 #include "VideoCommon/DriverDetails.h"
 #include "VideoCommon/VideoConfig.h"
+#ifdef ANDROID
+#include "VideoBackends/Vulkan/AdrenoOptimizations.h"
+#endif
 
 namespace Vulkan
 {
@@ -55,83 +58,124 @@ VKTexture::~VKTexture()
   }
 }
 
-std::unique_ptr<VKTexture> VKTexture::Create(const TextureConfig& tex_config, std::string_view name)
-{
-  // Determine image usage, we need to flag as an attachment if it can be used as a rendertarget.
-  VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                            VK_IMAGE_USAGE_SAMPLED_BIT;
-  if (tex_config.IsRenderTarget())
-  {
-    usage |= IsDepthFormat(tex_config.format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
-                                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  }
-  if (tex_config.IsComputeImage())
-    usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+    std::unique_ptr<VKTexture> VKTexture::Create(const TextureConfig& tex_config, std::string_view name)
+    {
+        // Determine image usage, we need to flag as an attachment if it can be used as a rendertarget.
+        VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                  VK_IMAGE_USAGE_SAMPLED_BIT;
+        if (tex_config.IsRenderTarget())
+        {
+            usage |= IsDepthFormat(tex_config.format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        }
+        if (tex_config.IsComputeImage())
+            usage |= VK_IMAGE_USAGE_STORAGE_BIT;
 
-  VkImageCreateInfo image_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                                  nullptr,
-                                  tex_config.type == AbstractTextureType::Texture_CubeMap ?
-                                      VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT :
-                                      static_cast<VkImageCreateFlags>(0),
-                                  VK_IMAGE_TYPE_2D,
-                                  GetVkFormatForHostTextureFormat(tex_config.format),
-                                  {tex_config.width, tex_config.height, 1},
-                                  tex_config.levels,
-                                  tex_config.layers,
-                                  static_cast<VkSampleCountFlagBits>(tex_config.samples),
-                                  VK_IMAGE_TILING_OPTIMAL,
-                                  usage,
-                                  VK_SHARING_MODE_EXCLUSIVE,
-                                  0,
-                                  nullptr,
-                                  VK_IMAGE_LAYOUT_UNDEFINED};
+        // === AJOUTER : Tiling optimal pour Adreno 740 ===
+        VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;  // Par défaut
 
-  VmaAllocationCreateInfo alloc_create_info = {};
-  alloc_create_info.flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT;
-  alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-  alloc_create_info.pool = VK_NULL_HANDLE;
-  alloc_create_info.pUserData = nullptr;
-  alloc_create_info.priority =
-      tex_config.IsComputeImage() || tex_config.IsRenderTarget() ? 1.0 : 0.0;
-  alloc_create_info.requiredFlags = 0;
-  alloc_create_info.preferredFlags = 0;
+#ifdef ANDROID
+        if (g_vulkan_context->IsAdreno740())
+        {
+            auto compression_params = AdrenoOptimizations::GetTextureCompressionParams();
 
-  VkImage image = VK_NULL_HANDLE;
-  VmaAllocation alloc = VK_NULL_HANDLE;
-  VkResult res = vmaCreateImage(g_vulkan_context->GetMemoryAllocator(), &image_info,
-                                &alloc_create_info, &image, &alloc, nullptr);
-  if (res != VK_SUCCESS)
-  {
-    LOG_VULKAN_ERROR(res, "vmaCreateImage failed: ");
-    return nullptr;
-  }
+            // OPTIMAL tiling active UBWC (compression hardware) automatiquement sur Adreno
+            tiling = compression_params.prefer_linear_tiling ?
+                     VK_IMAGE_TILING_LINEAR : VK_IMAGE_TILING_OPTIMAL;
 
-  std::unique_ptr<VKTexture> texture = std::make_unique<VKTexture>(
-      tex_config, alloc, image, name, VK_IMAGE_LAYOUT_UNDEFINED, ComputeImageLayout::Undefined);
+            if (tiling == VK_IMAGE_TILING_OPTIMAL && tex_config.width >= 256 && tex_config.height >= 256)
+            {
+                INFO_LOG_FMT(VIDEO, "Adreno 740: UBWC compression enabled for {}x{} texture",
+                             tex_config.width, tex_config.height);
+            }
+        }
+#endif
 
-  VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-  if (tex_config.type == AbstractTextureType::Texture_CubeMap)
-  {
-    image_view_type = VK_IMAGE_VIEW_TYPE_CUBE;
-  }
-  else if (tex_config.type == AbstractTextureType::Texture_2D)
-  {
-    image_view_type = VK_IMAGE_VIEW_TYPE_2D;
-  }
-  else if (tex_config.type == AbstractTextureType::Texture_2DArray)
-  {
-    image_view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-  }
-  else
-  {
-    PanicAlertFmt("Unhandled texture type.");
-    return nullptr;
-  }
-  if (!texture->CreateView(image_view_type))
-    return nullptr;
+        VkImageCreateInfo image_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                                        nullptr,
+                                        tex_config.type == AbstractTextureType::Texture_CubeMap ?
+                                        VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT :
+                                        static_cast<VkImageCreateFlags>(0),
+                                        VK_IMAGE_TYPE_2D,
+                                        GetVkFormatForHostTextureFormat(tex_config.format),
+                                        {tex_config.width, tex_config.height, 1},
+                                        tex_config.levels,
+                                        tex_config.layers,
+                                        static_cast<VkSampleCountFlagBits>(tex_config.samples),
+                                        tiling,  // <-- MODIFIÉ ICI : utiliser tiling optimisé
+                                        usage,
+                                        VK_SHARING_MODE_EXCLUSIVE,
+                                        0,
+                                        nullptr,
+                                        VK_IMAGE_LAYOUT_UNDEFINED};
 
-  return texture;
-}
+        VmaAllocationCreateInfo alloc_create_info = {};
+        alloc_create_info.flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT;
+        alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+        alloc_create_info.pool = VK_NULL_HANDLE;
+        alloc_create_info.pUserData = nullptr;
+        alloc_create_info.priority =
+                tex_config.IsComputeImage() || tex_config.IsRenderTarget() ? 1.0 : 0.0;
+        alloc_create_info.requiredFlags = 0;
+        alloc_create_info.preferredFlags = 0;
+
+        // === AJOUTER : Memory type optimal pour Adreno 740 ===
+#ifdef ANDROID
+        if (g_vulkan_context->IsAdreno740())
+        {
+            auto memory_params = AdrenoOptimizations::GetOptimalMemoryParams();
+
+            if (memory_params.prefer_device_local_host_visible)
+            {
+                // Essayer d'obtenir DEVICE_LOCAL + HOST_VISIBLE pour réduire les copies CPU→GPU
+                alloc_create_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+                alloc_create_info.preferredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+
+                // Log seulement pour les grosses textures
+                if (tex_config.width >= 512 || tex_config.height >= 512)
+                {
+                    INFO_LOG_FMT(VIDEO, "Adreno 740: Requesting optimized memory for large texture");
+                }
+            }
+        }
+#endif
+
+        VkImage image = VK_NULL_HANDLE;
+        VmaAllocation alloc = VK_NULL_HANDLE;
+        VkResult res = vmaCreateImage(g_vulkan_context->GetMemoryAllocator(), &image_info,
+                                      &alloc_create_info, &image, &alloc, nullptr);
+        if (res != VK_SUCCESS)
+        {
+            LOG_VULKAN_ERROR(res, "vmaCreateImage failed: ");
+            return nullptr;
+        }
+
+        std::unique_ptr<VKTexture> texture = std::make_unique<VKTexture>(
+                tex_config, alloc, image, name, VK_IMAGE_LAYOUT_UNDEFINED, ComputeImageLayout::Undefined);
+
+        VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        if (tex_config.type == AbstractTextureType::Texture_CubeMap)
+        {
+            image_view_type = VK_IMAGE_VIEW_TYPE_CUBE;
+        }
+        else if (tex_config.type == AbstractTextureType::Texture_2D)
+        {
+            image_view_type = VK_IMAGE_VIEW_TYPE_2D;
+        }
+        else if (tex_config.type == AbstractTextureType::Texture_2DArray)
+        {
+            image_view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        }
+        else
+        {
+            PanicAlertFmt("Unhandled texture type.");
+            return nullptr;
+        }
+        if (!texture->CreateView(image_view_type))
+            return nullptr;
+
+        return texture;
+    }
 
 std::unique_ptr<VKTexture> VKTexture::CreateAdopted(const TextureConfig& tex_config, VkImage image,
                                                     VkImageViewType view_type, VkImageLayout layout)

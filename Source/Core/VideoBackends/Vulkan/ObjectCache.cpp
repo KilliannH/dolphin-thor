@@ -16,6 +16,9 @@
 #include "VideoBackends/Vulkan/VulkanContext.h"
 #include "VideoCommon/Constants.h"
 #include "VideoCommon/VideoCommon.h"
+#ifdef ANDROID
+#include "VideoBackends/Vulkan/AdrenoOptimizations.h"
+#endif
 
 namespace Vulkan
 {
@@ -523,26 +526,67 @@ public:
 
 bool ObjectCache::CreatePipelineCache()
 {
-  // Vulkan pipeline caches can be shared between games for shader compile time reduction.
-  // This assumes that drivers don't create all pipelines in the cache on load time, only
-  // when a lookup occurs that matches a pipeline (or pipeline data) in the cache.
-  m_pipeline_cache_filename = GetDiskShaderCacheFileName(APIType::Vulkan, "Pipeline", false, true);
+        // Vulkan pipeline caches can be shared between games for shader compile time reduction.
+        // This assumes that drivers don't create all pipelines in the cache on load time, only
+        // when a lookup occurs that matches a pipeline (or pipeline data) in the cache.
+        m_pipeline_cache_filename = GetDiskShaderCacheFileName(APIType::Vulkan, "Pipeline", false, true);
 
-  VkPipelineCacheCreateInfo info = {
-      VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,  // VkStructureType            sType
-      nullptr,                                       // const void*                pNext
-      0,                                             // VkPipelineCacheCreateFlags flags
-      0,                                             // size_t                     initialDataSize
-      nullptr                                        // const void*                pInitialData
-  };
+        // === AJOUTER : Taille optimale selon le GPU ===
+        size_t initial_cache_size = 256 * 1024 * 1024;  // 256MB par défaut
 
-  VkResult res =
-      vkCreatePipelineCache(g_vulkan_context->GetDevice(), &info, nullptr, &m_pipeline_cache);
-  if (res == VK_SUCCESS)
-    return true;
+#ifdef ANDROID
+        if (g_vulkan_context->IsAdreno740())
+  {
+    initial_cache_size = AdrenoOptimizations::GetOptimalPipelineCacheSize();
+    INFO_LOG_FMT(VIDEO, "Adreno 740: Pipeline cache size set to {} MB",
+                 initial_cache_size / (1024 * 1024));
+  }
+#endif
 
-  LOG_VULKAN_ERROR(res, "vkCreatePipelineCache failed: ");
-  return false;
+        // Charger le cache depuis le disque
+        std::vector<u8> cache_data;
+
+        if (File::Exists(m_pipeline_cache_filename))
+        {
+            File::IOFile file(m_pipeline_cache_filename, "rb");
+            if (file.IsOpen())
+            {
+                const u64 file_size = file.GetSize();
+
+                // Limiter la taille si nécessaire
+                const u64 size_to_read = std::min(file_size, static_cast<u64>(initial_cache_size));
+
+                cache_data.resize(size_to_read);
+                if (file.ReadBytes(cache_data.data(), size_to_read))
+                {
+                    INFO_LOG_FMT(VIDEO, "Loaded {} KB pipeline cache from disk",
+                                 size_to_read / 1024);
+                }
+                else
+                {
+                    ERROR_LOG_FMT(VIDEO, "Failed to read pipeline cache file");
+                    cache_data.clear();
+                }
+            }
+        }
+
+        VkPipelineCacheCreateInfo info = {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .initialDataSize = cache_data.size(),
+                .pInitialData = cache_data.empty() ? nullptr : cache_data.data()
+        };
+
+        VkResult res = vkCreatePipelineCache(g_vulkan_context->GetDevice(), &info,
+                                             nullptr, &m_pipeline_cache);
+        if (res != VK_SUCCESS)
+        {
+            LOG_VULKAN_ERROR(res, "vkCreatePipelineCache failed: ");
+            return false;
+        }
+
+        return true;
 }
 
 bool ObjectCache::LoadPipelineCache()

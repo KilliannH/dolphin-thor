@@ -376,19 +376,6 @@ void JitArm64::lXX(UGeckoInstruction inst)
   INSTRUCTION_START
   JITDISABLE(bJITLoadStoreOff);
 
-#ifdef ANDROID
-    if (AndroidCpuAffinity::IsSnapdragon8Gen2())
-  {
-    // Prefetch agressif pour LPDDR5X (68 GB/s sur Ayn Thor)
-    // Distance optimale = 2 cache lines (128 bytes)
-    const int prefetch_distance = 128;
-
-    // PRFM = Prefetch Memory
-    // PLDL1KEEP = Prefetch for Load, L1 cache, temporal
-    PRFM(MemOperand(addr_reg, prefetch_distance), PLDL1KEEP);
-  }
-#endif
-
   u32 a = inst.RA, b = inst.RB, d = inst.RD;
   s32 offset = inst.SIMM_16;
   s32 offsetReg = -1;
