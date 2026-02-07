@@ -37,9 +37,6 @@
 #include "Core/PowerPC/JitInterface.h"
 #include "Core/PowerPC/PowerPC.h"
 #include "Core/System.h"
-#ifdef ANDROID
-#include "jni/AndroidCommon/CpuAffinity.h"
-#endif
 
 using namespace Arm64Gen;
 
@@ -79,19 +76,7 @@ void JitArm64::Init()
   // AddChildCodeSpace grabs space from the end of the parent region,
   // so we have to call AddChildCodeSpace in reverse order.
 
-    // Optimisations cache pour SD8G2
-    if (AndroidCpuAffinity::IsSnapdragon8Gen2())
-    {
-        // Cache L2: 512KB par cluster Gold
-        // Cache L3: 6MB partagé
-
-        // Augmenter taille code cache pour profiter du L3
-        AllocCodeSpace(64 * 1024 * 1024);  // 64MB au lieu de 32MB
-
-        INFO_LOG_FMT(POWERPC, "Snapdragon 8 Gen 2 JIT optimizations enabled");
-    } else {
-        AllocCodeSpace(TOTAL_CODE_SIZE);
-    }
+  AllocCodeSpace(TOTAL_CODE_SIZE);
   AddChildCodeSpace(&m_far_code_1, FAR_CODE_SIZE);
   AddChildCodeSpace(&m_near_code_1, NEAR_CODE_SIZE);
   AddChildCodeSpace(&m_near_code_0, NEAR_CODE_SIZE);
