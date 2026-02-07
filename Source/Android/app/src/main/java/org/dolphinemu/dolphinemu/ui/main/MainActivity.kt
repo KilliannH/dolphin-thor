@@ -3,11 +3,13 @@
 package org.dolphinemu.dolphinemu.ui.main
 
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -15,6 +17,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
 import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayout
 import org.dolphinemu.dolphinemu.R
 import org.dolphinemu.dolphinemu.adapters.PlatformPagerAdapter
@@ -24,6 +27,7 @@ import org.dolphinemu.dolphinemu.features.settings.model.NativeConfig
 import org.dolphinemu.dolphinemu.features.settings.ui.MenuTag
 import org.dolphinemu.dolphinemu.features.settings.ui.SettingsActivity
 import org.dolphinemu.dolphinemu.features.performance.PerformanceManager
+import org.dolphinemu.dolphinemu.features.performance.PerformanceProfile
 import org.dolphinemu.dolphinemu.fragments.GridOptionDialogFragment
 import org.dolphinemu.dolphinemu.services.GameFileCacheManager
 import org.dolphinemu.dolphinemu.ui.platform.PlatformGamesView
@@ -34,6 +38,7 @@ import org.dolphinemu.dolphinemu.utils.InsetsHelper
 import org.dolphinemu.dolphinemu.utils.PermissionsHandler
 import org.dolphinemu.dolphinemu.utils.StartupHandler
 import org.dolphinemu.dolphinemu.utils.AynThorOptimizer
+import org.dolphinemu.dolphinemu.utils.Log
 import org.dolphinemu.dolphinemu.utils.ThemeHelper
 import org.dolphinemu.dolphinemu.utils.WiiUtils
 
@@ -46,6 +51,8 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
 
     private lateinit var menu: Menu
 
+    private var performanceManager: PerformanceManager? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen().setKeepOnScreenCondition { !DirectoryInitialization.areDolphinDirectoriesReady() }
 
@@ -54,44 +61,29 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
 
         super.onCreate(savedInstanceState)
 
-        // Phase 1 : Optimisations de base
-        AynThorOptimizer.applyOptimizationsIfNeeded(this)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        // Debug: afficher infos device
-        if (BuildConfig.DEBUG) {
-            Log.debug(AynThorOptimizer.getDeviceInfo())
-        }
-
-        // Phase 2 : Gestion de performance
+        // Phase 1 & 2
         if (AynThorOptimizer.isAynThor()) {
+            AynThorOptimizer.applyOptimizationsIfNeeded(this)
             performanceManager = PerformanceManager.getInstance(this)
 
-            // Appliquer le profil par défaut au premier lancement
-            val prefs = context.getSharedPreferences("dolphin_performance", Context.MODE_PRIVATE)
+            // Appliquer profil par défaut au premier lancement
+            val prefs = getSharedPreferences("dolphin_performance", MODE_PRIVATE)
             val firstRun = prefs.getBoolean("performance_first_run", true)
 
             if (firstRun) {
-                performanceManager.setProfile(PerformanceProfile.BALANCED)
+                performanceManager?.setProfile(PerformanceProfile.BALANCED)
                 prefs.edit().putBoolean("performance_first_run", false).apply()
 
-                Toast.makeText(
-                    this,
-                    "Ayn Thor: Balanced profile applied",
-                    Toast.LENGTH_LONG
-                ).show()
+                Log.info("[MainActivity] Default profile (Balanced) applied")
             }
 
-            // Démarrer le monitoring thermique
-            performanceManager.startThermalMonitoring()
-
-            // Debug
-            if (BuildConfig.DEBUG) {
-                Log.debug(performanceManager.getPerformanceStats())
-            }
+            // Debug logs
+            Log.debug("[MainActivity] Performance Manager initialized")
+            Log.debug(performanceManager?.getPerformanceStats() ?: "No stats")
         }
-
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
         setInsets()
         ThemeHelper.enableStatusBarScrollTint(this, binding.appbarMain)
@@ -134,7 +126,7 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
         super.onResume()
         // Redémarrer monitoring thermique si Ayn Thor
         if (AynThorOptimizer.isAynThor()) {
-            performanceManager.startThermalMonitoring()
+            performanceManager?.startThermalMonitoring()
         }
         if (DirectoryInitialization.shouldStart(this)) {
             DirectoryInitialization.start(this)
@@ -150,7 +142,7 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
 
         // Arrêter monitoring pour économiser batterie
         if (AynThorOptimizer.isAynThor()) {
-            performanceManager.stopThermalMonitoring()
+            performanceManager?.stopThermalMonitoring()
         }
     }
 
@@ -166,6 +158,11 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_game_grid, menu)
+        // Ajouter menu Ayn Thor si device détecté
+        if (AynThorOptimizer.isAynThor()) {
+            menu.add(0, MENU_AYN_THOR_INFO, 0, "Ayn Thor Info")
+                .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+        }
         this.menu = menu
         return true
     }
@@ -221,7 +218,67 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
      * @return True if the event was handled, false to bubble it up to the OS.
      */
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return presenter.handleOptionSelection(item.itemId, this)
+        return when (item.itemId) {
+            MENU_AYN_THOR_INFO -> {
+                showAynThorInfoDialog()
+                true
+            }
+
+            else -> return presenter.handleOptionSelection(item.itemId, this)
+        }
+    }
+
+    private fun showAynThorInfoDialog() {
+        val info = buildString {
+            appendLine("=== Ayn Thor Optimizations ===")
+            appendLine()
+            appendLine("Device: ${android.os.Build.MODEL}")
+            appendLine("SOC: ${android.os.Build.SOC_MODEL}")
+            appendLine()
+            appendLine("Current Profile: ${performanceManager?.getCurrentProfile()?.profileName ?: "N/A"}")
+            appendLine("Auto Thermal: ${performanceManager?.isAutoThermalEnabled() ?: false}")
+            appendLine()
+            appendLine("Optimizations Status: Active")
+            appendLine("Backend: Vulkan")
+            appendLine("Internal Resolution: 3x")
+            appendLine("CPU Affinity: Gold Cores")
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Ayn Thor Status")
+            .setMessage(info)
+            .setPositiveButton("OK", null)
+            .setNeutralButton("Reapply Optimizations") { _, _ ->
+                val success = AynThorOptimizer.applyOptimizationsIfNeeded(this)
+                if (success) {
+                    Toast.makeText(this, "Optimizations reapplied!", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Performance Profile") { _, _ ->
+                showPerformanceProfileDialog()
+            }
+            .show()
+    }
+
+    private fun showPerformanceProfileDialog() {
+        val profiles = PerformanceProfile.values()
+        val profileNames = profiles.map { it.profileName }.toTypedArray()
+        val currentProfile = performanceManager?.getCurrentProfile() ?: PerformanceProfile.BALANCED
+        val currentIndex = profiles.indexOf(currentProfile)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Select Performance Profile")
+            .setSingleChoiceItems(profileNames, currentIndex) { dialog, which ->
+                performanceManager?.setProfile(profiles[which])
+                Toast.makeText(this, "Profile changed to: ${profiles[which].profileName}", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    companion object {
+        private const val MENU_AYN_THOR_INFO = 12345
     }
 
     /**

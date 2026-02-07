@@ -4,7 +4,6 @@ package org.dolphinemu.dolphinemu.features.performance
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import androidx.preference.PreferenceManager
 import org.dolphinemu.dolphinemu.features.settings.model.NativeConfig
 import org.dolphinemu.dolphinemu.utils.Log
 
@@ -99,9 +98,9 @@ class PerformanceManager private constructor(private val context: Context) {
      */
     fun applyCurrentProfile() {
         try {
-            val config = NativeConfig()
+            val config = NativeConfig
             currentProfile.apply(config)
-            config.saveSettings()
+            config.save(0)
 
             Log.info("[$TAG] Profile ${currentProfile.name} applied successfully")
         } catch (e: Exception) {
@@ -152,9 +151,9 @@ class PerformanceManager private constructor(private val context: Context) {
             // Appliquer temporairement le profil recommandé
             // Note: on ne change pas currentProfile pour garder la préférence utilisateur
             try {
-                val config = NativeConfig()
+                val config = NativeConfig
                 recommendedProfile.apply(config)
-                config.saveSettings()
+                config.save(0)
             } catch (e: Exception) {
                 Log.error("[$TAG] Failed to apply thermal adjustment: ${e.message}")
             }

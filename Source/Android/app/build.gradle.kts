@@ -9,7 +9,7 @@ plugins {
 
 @Suppress("UnstableApiUsage")
 android {
-    compileSdkVersion = "android-36"
+    compileSdk = 36
     ndkVersion = "29.0.14206865"
 
     buildFeatures {
@@ -43,7 +43,7 @@ android {
 
     defaultConfig {
         applicationId = "org.dolphinemu.dolphinemu"
-        minSdk = 21
+        minSdk = 31
         targetSdk = 36
 
         versionCode = getBuildVersionCode()
@@ -82,6 +82,7 @@ android {
                 getDefaultProguardFile("proguard-android.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
 
         // Signed by debug key disallowing distribution on Play Store.

@@ -4,7 +4,6 @@ package org.dolphinemu.dolphinemu.features.performance
 import android.content.Context
 import android.os.Build
 import android.os.PowerManager
-import androidx.annotation.RequiresApi
 import org.dolphinemu.dolphinemu.utils.Log
 
 /**
@@ -35,19 +34,22 @@ class ThermalMonitor(private val context: Context) {
     /**
      * Récupère l'état thermique actuel (Android 9+)
      */
-    @RequiresApi(Build.VERSION_CODES.Q)
-    fun getCurrentThermalState(): ThermalState {
+    fun getCurrentThermalState(context: Context): ThermalState {
+        if (Build.VERSION.SDK_INT < 29) return ThermalState.NONE
+
         return try {
-            val thermalService = context.getSystemService(Context.THERMAL_SERVICE)
-            if (thermalService != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val thermal = thermalService as android.os.ThermalManager
-                val status = thermal.currentThermalStatus
-                ThermalState.fromInt(status)
-            } else {
-                ThermalState.NONE
-            }
-        } catch (e: Exception) {
-            Log.error("[ThermalMonitor] Failed to get thermal state: ${e.message}")
+            // Pas besoin de Context.THERMAL_SERVICE
+            val svc = context.getSystemService("thermal") ?: return ThermalState.NONE
+
+            val tmClass = Class.forName("android.os.ThermalManager")
+            if (!tmClass.isInstance(svc)) return ThermalState.NONE
+
+            // Méthode Java: getCurrentThermalStatus()
+            val method = tmClass.getMethod("getCurrentThermalStatus")
+            val status = method.invoke(svc) as Int
+
+            ThermalState.fromInt(status)
+        } catch (_: Throwable) {
             ThermalState.NONE
         }
     }
@@ -57,7 +59,7 @@ class ThermalMonitor(private val context: Context) {
      */
     fun getThermalStateLegacy(): ThermalState {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            getCurrentThermalState()
+            getCurrentThermalState(context)
         } else {
             // Fallback pour Android < 9 : utiliser battery temperature
             estimateThermalFromBattery()

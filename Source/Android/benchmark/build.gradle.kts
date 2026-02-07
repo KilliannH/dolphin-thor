@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "org.dolphinemu.baselineprofile"
-    compileSdk = 34
+    compileSdk = 36
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -23,7 +23,7 @@ android {
     }
 
     defaultConfig {
-        minSdk = 28
+        minSdk = 31
         targetSdk = 34
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

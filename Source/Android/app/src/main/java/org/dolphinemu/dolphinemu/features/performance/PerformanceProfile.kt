@@ -16,38 +16,38 @@ enum class PerformanceProfile(
     ) {
         override fun apply(config: NativeConfig) {
             // === CORE ===
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "CPUThread", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "SyncGPU", true) // Plus économe
-            config.setInt(NativeConfig.LAYER_BASE, "Core", "SyncGPUMaxDistance", 100000)
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "FastDiscSpeed", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin", "Core", "CPUThread", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "SyncGPU", true) // Plus économe
+            config.setInt(NativeConfig.LAYER_BASE, "Dolphin","Core", "SyncGPUMaxDistance", 100000)
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "FastDiscSpeed", true)
 
             // === GRAPHICS ===
-            config.setString(NativeConfig.LAYER_BASE, "Core", "GFXBackend", "Vulkan")
-            config.setInt(NativeConfig.LAYER_BASE, "GFX", "ShaderCompilationMode", 2)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "WaitForShadersBeforeStarting", false)
+            config.setString(NativeConfig.LAYER_BASE, "Dolphin","Core", "GFXBackend", "Vulkan")
+            config.setInt(NativeConfig.LAYER_BASE, "GFX", "Settings", "ShaderCompilationMode", 2)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "Settings","WaitForShadersBeforeStarting", false)
 
             // Résolution 2x (économie GPU)
-            config.setInt(NativeConfig.LAYER_BASE, "GFX", "InternalResolution", 2)
+            config.setInt(NativeConfig.LAYER_BASE, "GFX","Settings", "InternalResolution", 2)
 
             // Pas d'anisotropic filtering
-            config.setInt(NativeConfig.LAYER_BASE, "GFX", "MaxAnisotropy", 0)
+            config.setInt(NativeConfig.LAYER_BASE, "GFX", "Enhancements","MaxAnisotropy", 0)
 
             // === HACKS (Performance Max) ===
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "EFBAccessEnable", false)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "EFBToTextureEnable", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "EFBScaledCopy", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "DeferEFBCopies", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "SkipDuplicateXFBs", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "ImmediateXFBEnable", false)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "FastDepthCalc", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "BBoxEnable", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "EFBAccessEnable", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "EFBToTextureEnable", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "EFBScaledCopy", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "DeferEFBCopies", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "SkipDuplicateXFBs", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "ImmediateXFBEnable", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "FastDepthCalc", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "BBoxEnable", false)
 
             // VSync pour limiter FPS et économiser batterie
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "VSync", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "Settings","VSync", true)
 
             // === AUDIO ===
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "DSPHLE", true)
-            config.setString(NativeConfig.LAYER_BASE, "DSP", "Backend", "Cubeb")
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "DSPHLE", true)
+            config.setString(NativeConfig.LAYER_BASE, "Dolphin","DSP", "Backend", "Cubeb")
         }
     },
 
@@ -57,38 +57,38 @@ enum class PerformanceProfile(
     ) {
         override fun apply(config: NativeConfig) {
             // === CORE ===
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "CPUThread", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "SyncGPU", false)
-            config.setInt(NativeConfig.LAYER_BASE, "Core", "SyncGPUMaxDistance", 200000)
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "FastDiscSpeed", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "CPUThread", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "SyncGPU", false)
+            config.setInt(NativeConfig.LAYER_BASE, "Dolphin","Core", "SyncGPUMaxDistance", 200000)
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "FastDiscSpeed", true)
 
             // === GRAPHICS ===
-            config.setString(NativeConfig.LAYER_BASE, "Core", "GFXBackend", "Vulkan")
-            config.setInt(NativeConfig.LAYER_BASE, "GFX", "ShaderCompilationMode", 2)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "WaitForShadersBeforeStarting", false)
+            config.setString(NativeConfig.LAYER_BASE, "Dolphin","Core", "GFXBackend", "Vulkan")
+            config.setInt(NativeConfig.LAYER_BASE, "GFX", "Settings", "ShaderCompilationMode", 2)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Settings", "WaitForShadersBeforeStarting", false)
 
             // Résolution 3x (bon équilibre)
-            config.setInt(NativeConfig.LAYER_BASE, "GFX", "InternalResolution", 3)
+            config.setInt(NativeConfig.LAYER_BASE, "GFX","Settings", "InternalResolution", 3)
 
             // Anisotropic filtering 4x
-            config.setInt(NativeConfig.LAYER_BASE, "GFX", "MaxAnisotropy", 4)
+            config.setInt(NativeConfig.LAYER_BASE, "GFX","Enhancements", "MaxAnisotropy", 4)
 
             // === HACKS ===
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "EFBAccessEnable", false)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "EFBToTextureEnable", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "EFBScaledCopy", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "DeferEFBCopies", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "SkipDuplicateXFBs", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "ImmediateXFBEnable", false)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "FastDepthCalc", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "BBoxEnable", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "EFBAccessEnable", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "EFBToTextureEnable", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "EFBScaledCopy", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "DeferEFBCopies", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "SkipDuplicateXFBs", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "ImmediateXFBEnable", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "Hacks","FastDepthCalc", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "Hacks","BBoxEnable", false)
 
             // VSync OFF
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "VSync", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Settings", "VSync", false)
 
             // === AUDIO ===
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "DSPHLE", true)
-            config.setString(NativeConfig.LAYER_BASE, "DSP", "Backend", "Cubeb")
+            config.setBoolean(NativeConfig.LAYER_BASE,"Dolphin", "Core", "DSPHLE", true)
+            config.setString(NativeConfig.LAYER_BASE, "Dolphin","DSP", "Backend", "Cubeb")
         }
     },
 
@@ -98,38 +98,38 @@ enum class PerformanceProfile(
     ) {
         override fun apply(config: NativeConfig) {
             // === CORE ===
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "CPUThread", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "SyncGPU", false)
-            config.setInt(NativeConfig.LAYER_BASE, "Core", "SyncGPUMaxDistance", 400000)
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "FastDiscSpeed", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "CPUThread", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "SyncGPU", false)
+            config.setInt(NativeConfig.LAYER_BASE, "Dolphin","Core", "SyncGPUMaxDistance", 400000)
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "FastDiscSpeed", true)
 
             // === GRAPHICS ===
-            config.setString(NativeConfig.LAYER_BASE, "Core", "GFXBackend", "Vulkan")
-            config.setInt(NativeConfig.LAYER_BASE, "GFX", "ShaderCompilationMode", 2)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "WaitForShadersBeforeStarting", false)
+            config.setString(NativeConfig.LAYER_BASE, "Dolphin","Core", "GFXBackend", "Vulkan")
+            config.setInt(NativeConfig.LAYER_BASE, "GFX", "Settings","ShaderCompilationMode", 2)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "Settings","WaitForShadersBeforeStarting", false)
 
             // Résolution 4x (qualité maximale si SD8G2 peut gérer)
-            config.setInt(NativeConfig.LAYER_BASE, "GFX", "InternalResolution", 4)
+            config.setInt(NativeConfig.LAYER_BASE, "GFX","Settings", "InternalResolution", 4)
 
             // Anisotropic filtering 8x
-            config.setInt(NativeConfig.LAYER_BASE, "GFX", "MaxAnisotropy", 8)
+            config.setInt(NativeConfig.LAYER_BASE, "GFX","Enhancements", "MaxAnisotropy", 8)
 
             // === HACKS ===
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "EFBAccessEnable", false)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "EFBToTextureEnable", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "EFBScaledCopy", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "DeferEFBCopies", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "SkipDuplicateXFBs", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "ImmediateXFBEnable", false)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "FastDepthCalc", true)
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "BBoxEnable", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "EFBAccessEnable", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "EFBToTextureEnable", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "EFBScaledCopy", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "DeferEFBCopies", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "SkipDuplicateXFBs", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "ImmediateXFBEnable", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "FastDepthCalc", true)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Hacks", "BBoxEnable", false)
 
             // VSync OFF
-            config.setBoolean(NativeConfig.LAYER_BASE, "GFX", "VSync", false)
+            config.setBoolean(NativeConfig.LAYER_BASE, "GFX","Settings", "VSync", false)
 
             // === AUDIO ===
-            config.setBoolean(NativeConfig.LAYER_BASE, "Core", "DSPHLE", true)
-            config.setString(NativeConfig.LAYER_BASE, "DSP", "Backend", "Cubeb")
+            config.setBoolean(NativeConfig.LAYER_BASE, "Dolphin","Core", "DSPHLE", true)
+            config.setString(NativeConfig.LAYER_BASE, "Dolphin","DSP", "Backend", "Cubeb")
         }
     };
 
